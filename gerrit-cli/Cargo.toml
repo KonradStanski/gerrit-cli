@@ -1,0 +1,19 @@
+[package]
+name = "gerrit-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "gerrit"
+path = "src/main.rs"
+
+[dependencies]
+gerrit-api = { path = "../gerrit-api" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+colored = "3"
+dirs = "6"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+url = "2"
