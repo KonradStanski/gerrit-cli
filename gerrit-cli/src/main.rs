@@ -34,6 +34,20 @@ fn main() -> Result<()> {
             ConfigAction::Init => commands::config::run_init()?,
         },
 
+        // Commands that need a Gerrit base URL but not full auth
+        Commands::InstallHooks => {
+            let base_url = config::resolve_base_url(cli.url.as_deref())?;
+            commands::install_hooks::run(&base_url)?;
+        }
+        Commands::Clone {
+            project,
+            directory,
+            http,
+        } => {
+            let base_url = config::resolve_base_url(cli.url.as_deref())?;
+            commands::clone::run(&base_url, project, directory.as_deref(), *http)?;
+        }
+
         // Commands that need a Gerrit client
         cmd => {
             let client = build_client(cli.url.as_deref())?;
@@ -89,7 +103,14 @@ fn main() -> Result<()> {
                 Commands::Abandon { change, message } => {
                     commands::abandon::run(&client, change, message.as_deref())?;
                 }
-                Commands::Push { .. } | Commands::Config { .. } => unreachable!(),
+                Commands::Projects { filter, regex, number } => {
+                    commands::projects::run(&client, filter.as_deref(), regex.as_deref(), *number)?;
+
+                }
+                Commands::Push { .. }
+                | Commands::Config { .. }
+                | Commands::InstallHooks
+                | Commands::Clone { .. } => unreachable!(),
             }
         }
     }
@@ -100,7 +121,7 @@ fn main() -> Result<()> {
 fn build_client(cli_url: Option<&str>) -> Result<gerrit_api::GerritClient> {
     let base_url = config::resolve_base_url(cli_url)?;
     let username = config::resolve_username()?;
-    let password = config::resolve_password(&base_url)?;
+    let password = config::resolve_password(&base_url, &username)?;
 
     let client = gerrit_api::GerritClient::new(&base_url, &username, &password)?;
     Ok(client)

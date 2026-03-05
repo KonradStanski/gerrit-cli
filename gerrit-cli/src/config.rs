@@ -120,28 +120,59 @@ pub fn resolve_username() -> Result<String> {
         }
     }
 
+    // Fall back to system username
+    if let Ok(user) = std::env::var("USER") {
+        return Ok(user);
+    }
+
     anyhow::bail!("Could not determine username. Set GERRIT_USERNAME or run `gerrit config init`.")
 }
 
 /// Resolve password, trying:
 /// 1. GERRIT_PASSWORD env var
-/// 2. git credential fill
-pub fn resolve_password(url: &str) -> Result<String> {
+/// 2. git credential fill (non-interactive)
+/// 3. Browser login flow: open Gerrit HTTP credentials page, user pastes password
+pub fn resolve_password(url: &str, username: &str) -> Result<String> {
     if let Ok(pass) = std::env::var("GERRIT_PASSWORD") {
         return Ok(pass);
     }
 
-    // Try git credential fill
-    if let Ok(pass) = git_credential_password(url) {
+    // Try git credential fill non-interactively
+    if let Ok(pass) = git_credential_password(url, username) {
         return Ok(pass);
     }
 
-    anyhow::bail!(
-        "Could not determine password. Set GERRIT_PASSWORD env var or configure git credentials."
-    )
+    // Interactive: open browser to Gerrit HTTP credentials page, prompt for password
+    let parsed = url::Url::parse(url)?;
+    let host = parsed.host_str().unwrap_or("unknown");
+    let creds_url = format!("{url}/settings/#HTTPCredentials");
+
+    eprintln!("No saved credentials for {host}.");
+    eprintln!("Opening {creds_url}");
+    eprintln!("Generate an HTTP password and paste it here.\n");
+
+    let _ = std::process::Command::new("open")
+        .arg(&creds_url)
+        .spawn();
+
+    eprint!("HTTP password: ");
+    std::io::Write::flush(&mut std::io::stderr())?;
+    let mut password = String::new();
+    std::io::stdin().read_line(&mut password)?;
+    let password = password.trim().to_string();
+
+    if password.is_empty() {
+        anyhow::bail!("No password provided.");
+    }
+
+    // Store via git credential approve so we don't ask again
+    git_credential_approve(url, username, &password)?;
+    eprintln!("Credentials saved.");
+
+    Ok(password)
 }
 
-fn git_credential_password(url: &str) -> Result<String> {
+fn git_credential_password(url: &str, username: &str) -> Result<String> {
     use std::io::Write;
     use std::process::{Command, Stdio};
 
@@ -149,10 +180,11 @@ fn git_credential_password(url: &str) -> Result<String> {
     let host = parsed.host_str().unwrap_or("");
     let protocol = parsed.scheme();
 
-    let input = format!("protocol={protocol}\nhost={host}\n\n");
+    let input = format!("protocol={protocol}\nhost={host}\nusername={username}\n\n");
 
     let mut child = Command::new("git")
         .args(["credential", "fill"])
+        .env("GIT_TERMINAL_PROMPT", "0")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -163,15 +195,49 @@ fn git_credential_password(url: &str) -> Result<String> {
     }
 
     let output = child.wait_with_output()?;
+
+    if !output.status.success() {
+        anyhow::bail!("git credential fill failed");
+    }
+
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     for line in stdout.lines() {
         if let Some(pass) = line.strip_prefix("password=") {
-            return Ok(pass.to_string());
+            if !pass.is_empty() {
+                return Ok(pass.to_string());
+            }
         }
     }
 
     anyhow::bail!("git credential fill did not return a password")
+}
+
+fn git_credential_approve(url: &str, username: &str, password: &str) -> Result<()> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let parsed = url::Url::parse(url)?;
+    let host = parsed.host_str().unwrap_or("");
+    let protocol = parsed.scheme();
+
+    let input = format!(
+        "protocol={protocol}\nhost={host}\nusername={username}\npassword={password}\n\n"
+    );
+
+    let mut child = Command::new("git")
+        .args(["credential", "approve"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin.write_all(input.as_bytes())?;
+    }
+
+    child.wait()?;
+    Ok(())
 }
 
 /// Try to extract a Gerrit base URL from a git remote URL.

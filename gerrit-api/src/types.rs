@@ -150,3 +150,20 @@ pub struct AbandonInput {
 pub struct ReviewerInput {
     pub reviewer: String,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct WebLinkInfo {
+    pub name: Option<String>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectInfo {
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub state: Option<String>,
+    pub description: Option<String>,
+    pub web_links: Option<Vec<WebLinkInfo>>,
+    #[serde(rename = "_more_projects")]
+    pub more_projects: Option<bool>,
+}

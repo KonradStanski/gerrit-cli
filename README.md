@@ -61,6 +61,9 @@ gerrit review 12345 --code-review 1 --message "LGTM"
 | `gerrit review <change>` | | Post a review with scores |
 | `gerrit submit <change>` | | Submit a change for merging |
 | `gerrit abandon <change>` | | Abandon a change |
+| `gerrit projects` | | List projects on the Gerrit server |
+| `gerrit clone <project>` | | Clone a project with hooks pre-configured |
+| `gerrit install-hooks` | | Install Gerrit commit-msg hook into current repo |
 | `gerrit config` | | Manage CLI configuration |
 
 ### `gerrit ls`
@@ -77,6 +80,32 @@ gerrit ls --query "status:open label:Code-Review+2"
 
 # Limit results
 gerrit ls -n 10
+```
+
+### `gerrit clone`
+
+```sh
+# Clone a project (SSH, default port 29418)
+gerrit clone my/project
+
+# Clone into a specific directory
+gerrit clone my/project my-dir
+
+# Clone over HTTPS instead of SSH
+gerrit clone my/project --http
+```
+
+### `gerrit projects`
+
+```sh
+# List all projects
+gerrit projects
+
+# Filter by regex
+gerrit projects --filter "my-team/"
+
+# Limit results
+gerrit projects -n 20
 ```
 
 ### `gerrit checkout`
@@ -127,6 +156,15 @@ gerrit comments 12345
 # Show inline file comments
 gerrit comments 12345 --inline
 ```
+
+### `gerrit install-hooks`
+
+```sh
+# Install the Gerrit commit-msg hook into the current repo
+gerrit install-hooks
+```
+
+The commit-msg hook is also installed automatically when you run `gerrit checkout` or `gerrit clone`.
 
 ## Configuration
 

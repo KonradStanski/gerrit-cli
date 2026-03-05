@@ -1,8 +1,11 @@
 pub mod abandon;
 pub mod checkout;
+pub mod clone;
 pub mod comments;
 pub mod config;
+pub mod install_hooks;
 pub mod ls;
+pub mod projects;
 pub mod push;
 pub mod review;
 pub mod show;

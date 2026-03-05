@@ -125,6 +125,37 @@ pub enum Commands {
         message: Option<String>,
     },
 
+    /// Install Gerrit commit-msg hook into current repo
+    InstallHooks,
+
+    /// List projects on the Gerrit server
+    Projects {
+        /// Filter projects by name (substring match)
+        #[arg(short, long)]
+        filter: Option<String>,
+
+        /// Filter projects by regex
+        #[arg(short, long, conflicts_with = "filter")]
+        regex: Option<String>,
+
+        /// Maximum number of results
+        #[arg(short, long, default_value = "100")]
+        number: u32,
+    },
+
+    /// Clone a Gerrit project with hooks pre-configured
+    Clone {
+        /// Project name (e.g. "my/project")
+        project: String,
+
+        /// Target directory (default: last component of project name)
+        directory: Option<String>,
+
+        /// Use HTTPS clone URL instead of SSH
+        #[arg(long)]
+        http: bool,
+    },
+
     /// Manage CLI configuration
     Config {
         #[command(subcommand)]

@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 
 use crate::git;
 
+use super::install_hooks;
+
 pub fn run(
     client: &gerrit_api::GerritClient,
     change_number: i64,
@@ -42,6 +44,16 @@ pub fn run(
 
     let subject = detail.subject.as_deref().unwrap_or("(no subject)");
     println!("Checked out change {change_number} patchset {ps}: {subject}");
+
+    // Auto-install commit-msg hook if missing
+    if let Ok(root) = git::repo_root() {
+        let base_url = client.base_url().as_str();
+        match install_hooks::install_commit_msg_hook(base_url, &root) {
+            Ok(true) => println!("Installed Gerrit commit-msg hook."),
+            Ok(false) => {}
+            Err(e) => eprintln!("Warning: could not install commit-msg hook: {e}"),
+        }
+    }
 
     Ok(())
 }

@@ -158,6 +158,29 @@ impl GerritClient {
         Ok(())
     }
 
+    /// Perform a GET request and return the raw response bytes (for non-JSON endpoints like hooks).
+    pub fn get_raw(&self, path: &str) -> Result<Vec<u8>> {
+        let url = self.url(path)?;
+        let mut req = self.client.get(url);
+
+        if self.is_authenticated() {
+            req = req.header(AUTHORIZATION, self.auth_header());
+        }
+
+        let resp = req.send()?;
+        let status = resp.status();
+
+        if !status.is_success() {
+            let body = resp.text()?;
+            return Err(GerritError::Api {
+                status: status.as_u16(),
+                message: body,
+            });
+        }
+
+        Ok(resp.bytes()?.to_vec())
+    }
+
     pub fn base_url(&self) -> &Url {
         &self.base_url
     }

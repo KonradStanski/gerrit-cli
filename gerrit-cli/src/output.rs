@@ -241,6 +241,87 @@ pub fn print_comments(comments: &std::collections::HashMap<String, Vec<gerrit_ap
     }
 }
 
+/// Format a projects map as a table for terminal output.
+pub fn print_projects_table(
+    projects: &std::collections::HashMap<String, gerrit_api::ProjectInfo>,
+) {
+    if projects.is_empty() {
+        println!("No projects found.");
+        return;
+    }
+
+    // Check if any entry signals more results
+    let has_more = projects
+        .values()
+        .any(|p| p.more_projects == Some(true));
+
+    // Sort by project name
+    let mut entries: Vec<_> = projects.iter().collect();
+    entries.sort_by_key(|(name, _)| name.as_str());
+
+    // Calculate column widths
+    let mut name_w = 7;
+    let mut state_w = 5;
+    let mut desc_w = 11;
+
+    for (name, info) in &entries {
+        name_w = name_w.max(name.len()).min(50);
+        state_w = state_w.max(info.state.as_deref().unwrap_or("").len());
+        let first_line = first_line_of(info.description.as_deref().unwrap_or(""));
+        desc_w = desc_w.max(first_line.len()).min(60);
+    }
+
+    // Header
+    println!(
+        "{:<name_w$}  {:<state_w$}  {:<desc_w$}",
+        "Project".bold(),
+        "State".bold(),
+        "Description".bold(),
+    );
+    println!("{}", "-".repeat(name_w + state_w + desc_w + 4));
+
+    for (name, info) in &entries {
+        let display_name = if name.len() > 50 {
+            format!("{}...", &name[..47])
+        } else {
+            name.to_string()
+        };
+        let state = info.state.as_deref().unwrap_or("");
+        let desc = first_line_of(info.description.as_deref().unwrap_or(""));
+        let desc = if desc.len() > 60 {
+            format!("{}...", &desc[..57])
+        } else {
+            desc.to_string()
+        };
+
+        let state_colored = match state {
+            "ACTIVE" => state.green().to_string(),
+            "READ_ONLY" => state.yellow().to_string(),
+            "HIDDEN" => state.dimmed().to_string(),
+            _ => state.to_string(),
+        };
+
+        println!(
+            "{:<name_w$}  {:<state_w$}  {:<desc_w$}",
+            display_name.cyan(),
+            state_colored,
+            desc,
+        );
+    }
+
+    if has_more {
+        println!(
+            "\nShowing {} projects (more available, use {} to see more)",
+            entries.len(),
+            "-n <limit>".bold()
+        );
+    }
+}
+
+fn first_line_of(s: &str) -> &str {
+    s.lines().next().unwrap_or("")
+}
+
 fn colorize_status(status: &str) -> String {
     match status {
         "NEW" => status.green().to_string(),

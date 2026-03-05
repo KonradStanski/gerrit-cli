@@ -1,6 +1,7 @@
 pub mod changes;
 pub mod client;
 pub mod error;
+pub mod projects;
 pub mod query;
 pub mod types;
 
